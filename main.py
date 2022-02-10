@@ -68,26 +68,27 @@ def get_films(file_content, year, coordinates):
     return sorted(films, key=lambda x: x[2])[:10]
 
 
-def ukrainian_films(file_content):
+def chornobyl_films(file_content):
     """
-    Find all films createn in Ukraine
+    Find all films createn in Chornobyl
     :param file_content: list with lines of file
     :return: list with lists with information about filmes
-    >>> ukrainian_films(['"10 sposobov" (2013)\\tKyiv, Ukraine	(studio)',\
+    >>> chornobyl_films(['"Extreme" (2009) {Tours}\\tChernobyl, Ukraine',\
     '"10" (2009)\\tKuala Lumpur, Malaysia	(on location)'])
-    [['"10 sposobov" (2013)', 'Kyiv, Ukraine   (studio)', \
-(50.4428422, 30.5347982)]]
+    [['"Extreme" (2009) {Tours}', 'Chernobyl, Ukraine', \
+(51.2705477, 30.2195609)]]
     """
-    ukr_films = []
+    ch_films = []
     for line in file_content:
-        if not "Ukraine" in line:
+        if (not "Chernobyl, Ukraine" in line) and \
+                (not "Pripyat, Ukraine" in line):
             continue
         film_inform = list(filter(None, line.split("\t")))
         coordinates_2 = get_geolocation(film_inform)
         if coordinates_2 is None:
             continue
-        ukr_films.append(film_inform[:2] + [coordinates_2])
-    return ukr_films
+        ch_films.append(film_inform[:2] + [coordinates_2])
+    return ch_films
 
 
 def get_geolocation(film_inform):
@@ -96,21 +97,23 @@ def get_geolocation(film_inform):
     :param film_inform: film and place where it was created
     :return: tuple with latitude and longitude
     """
-    geolocator = Nominatim(user_agent="geopyLab")
-    location = geolocator.geocode(film_inform[1], timeout=None)
-    while location is None:
-        if len(film_inform[1].split(", ")) > 2:
-            film_inform[1] = film_inform[1].split(", ")[-2].join(", ")
-            location = geolocator.geocode(film_inform[1], timeout=None)
-        elif len(film_inform[1].split(", ")) == 2:
-            film_inform[1] = film_inform[1][-1]
-            location = geolocator.geocode(film_inform[1], timeout=None)
-        else:
-            break
-    if location is not None:
-        coordinates = (location.latitude, location.longitude)
-        return coordinates
-
+    try:
+        geolocator = Nominatim(user_agent="geopyLab")
+        location = geolocator.geocode(film_inform[1])
+        while location is None:
+            if len(film_inform[1].split(", ")) > 2:
+                film_inform[1] = film_inform[1].split(", ")[-2].join(", ")
+                location = geolocator.geocode(film_inform[1])
+            elif len(film_inform[1].split(", ")) == 2:
+                film_inform[1] = film_inform[1][-1]
+                location = geolocator.geocode(film_inform[1])
+            else:
+                break
+        if location is not None:
+            coordinates = (location.latitude, location.longitude)
+            return coordinates
+    except TimeoutError:
+        return None
 
 def haversine(coordinate_1, coordinate_2):
     """
@@ -134,12 +137,12 @@ def haversine(coordinate_1, coordinate_2):
     return result
 
 
-def create_map(year, close_films, ukr_films, coordinates):
+def create_map(year, close_films, ch_films, coordinates):
     """
     Creates html file with map
     :param year: year, when films were created
     :param close_films: list with information about films
-    :param ukr_films: list with information about ukrainian films
+    :param ch_films: list with information about chornobyl films
     :param coordinates: coordinates where you want to start the map
     :return: None
     """
@@ -151,12 +154,18 @@ def create_map(year, close_films, ukr_films, coordinates):
                                                popup=film[0],
                                                icon=folium.Icon()))
     map.add_child(closest_places)
-    ukrainian = folium.FeatureGroup(name="Ukrainian Films")
-    for film in ukr_films:
-        ukrainian.add_child(folium.Marker(location=list(film[-1]),
+    chornobyl = folium.FeatureGroup(name="Chornobyl Films")
+    iterator = 0
+    for film in ch_films:
+        chornobyl.add_child(folium.Marker(location=[film[-1][0] + (-1) **
+                                                    iterator * iterator *
+                                                    0.0001, film[-1][1] + (-1)
+                                                    ** iterator * iterator *
+                                                    0.0001],
                                           popup=film[0],
                                           icon=folium.Icon()))
-    map.add_child(ukrainian)
+        iterator  += 1
+    map.add_child(chornobyl)
     map.add_child(folium.LayerControl())
     map.save('film_map.html')
 
@@ -173,8 +182,8 @@ def main():
     path = args.path_to_dataset
     content = read_file(path)
     films = get_films(content, year, (float(latitude), float(longitude)))
-    ukr_films = ukrainian_films(content)
-    create_map(year, films, ukr_films, (float(latitude), float(longitude)))
+    ch_films = chornobyl_films(content)
+    create_map(year, films, ch_films, (float(latitude), float(longitude)))
 
 
 if __name__ == "__main__":
