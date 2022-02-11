@@ -149,7 +149,15 @@ def create_map(year, close_films, ch_films, coordinates):
     map = folium.Map(location=list(coordinates),
                      zoom_start=10)
     closest_places = folium.FeatureGroup(name=year + " Films")
+    previous_film = 0
+    previous_film_coordinate = 0
     for film in close_films:
+        if film[-1] == previous_film:
+            film[-1] = list(film[-1])
+            film[-1][0] = previous_film_coordinate[0] + 0.0001
+        else:
+            previous_film = film[-1]
+        previous_film_coordinate = film[-1]
         closest_places.add_child(folium.Marker(location=list(film[-1]),
                                                popup=film[0],
                                                icon=folium.Icon()))
